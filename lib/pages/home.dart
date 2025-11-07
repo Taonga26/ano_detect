@@ -99,27 +99,48 @@ class _HomePageState extends State<HomePage> {
           ),
           PieChartWidget(pie: pie),
           const SizedBox(height: 30),
-          Text(
-            "📋 Detected Anomalies",
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          DataTable(
-            columns: const [
-              DataColumn(label: Text('Date')),
-              DataColumn(label: Text('Feature')),
-              DataColumn(label: Text('Value')),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "📋 Detected Anomalies",
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              Text(
+                "Total Anomalies: ${anomalies.length}",
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
-            rows: anomalies
-                .map(
-                  (a) => DataRow(
-                    cells: [
-                      DataCell(Text(a['Date'].toString())),
-                      DataCell(Text(a.keys.elementAt(1).toString())),
-                      DataCell(Text(a.values.elementAt(1).toString())),
-                    ],
-                  ),
-                )
-                .toList(),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columns: const [
+                DataColumn(label: Text('Date')),
+                DataColumn(label: Text('Close')),
+                DataColumn(label: Text('High')),
+                DataColumn(label: Text('Low')),
+                DataColumn(label: Text('Open')),
+                DataColumn(label: Text('Volume')),
+              ],
+              rows: anomalies
+                  .map(
+                    (a) => DataRow(
+                      cells: [
+                        DataCell(Text(a['Date'].toString())),
+                        DataCell(Text(a['Close']?.toString() ?? '-')),
+                        DataCell(Text(a['High']?.toString() ?? '-')),
+                        DataCell(Text(a['Low']?.toString() ?? '-')),
+                        DataCell(Text(a['Open']?.toString() ?? '-')),
+                        DataCell(Text(a['Volume']?.toString() ?? '-')),
+                      ],
+                    ),
+                  )
+                  .toList(),
+            ),
           ),
         ],
       ),
