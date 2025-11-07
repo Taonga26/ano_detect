@@ -99,8 +99,8 @@ class _HomePageState extends State<HomePage> {
           ),
           PieChartWidget(pie: pie),
           const SizedBox(height: 30),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 "📋 Detected Anomalies",
