@@ -1,11 +1,12 @@
 import 'dart:io';
+import 'package:ano_detect/pages/eda_chart.dart';
 import 'package:ano_detect/pages/pie_chart.dart';
 import 'package:ano_detect/pages/recent.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/service.dart';
-import 'eda_chart_clean.dart';
+
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
