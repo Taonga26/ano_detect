@@ -28,9 +28,14 @@ class EDAChart extends StatelessWidget {
     final dataRows = rows.skip(1).toList();
 
     List<double> extractColumn(String name) {
-      final idx = headers.indexWhere((h) => h.toLowerCase() == name.toLowerCase());
+      final idx = headers.indexWhere(
+        (h) => h.toLowerCase() == name.toLowerCase(),
+      );
       if (idx == -1) return [];
-      return dataRows.map((row) => _toDouble(row[idx])).where((v) => !v.isNaN).toList();
+      return dataRows
+          .map((row) => _toDouble(row[idx]))
+          .where((v) => !v.isNaN)
+          .toList();
     }
 
     final series = {
@@ -51,13 +56,15 @@ class EDAChart extends StatelessWidget {
         for (int i = 0; i < list.length; i++) {
           spots.add(FlSpot(i.toDouble(), list[i]));
         }
-        lineBars.add(LineChartBarData(
-          spots: spots,
-          isCurved: true,
-          dotData: FlDotData(show: false),
-          belowBarData: BarAreaData(show: false),
-          barWidth: 2,
-        ));
+        lineBars.add(
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            dotData: FlDotData(show: false),
+            belowBarData: BarAreaData(show: false),
+            barWidth: 2,
+          ),
+        );
       }
     });
 
