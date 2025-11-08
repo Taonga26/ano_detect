@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:csv/csv.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -7,12 +8,20 @@ import 'package:flutter/material.dart';
 ///
 /// Renders line charts for Exploratory Data Analysis (EDA) using either:
 /// 1. Server-provided EDA data (preferred) with keys: `dates`, `series`
-/// 2. Local CSV file (fallback) containing columns like Date, Open, High, Low, Close, Volume
+/// 2. Local CSV file or bytes (fallback) containing columns like Date, Open, High, Low, Close, Volume
 class EDAChart extends StatelessWidget {
   final File? csvFile;
+  final Uint8List? csvBytes;
   final Map<String, dynamic>? edaFromServer;
+  final bool forceReadCsv;
 
-  const EDAChart({super.key, this.csvFile, this.edaFromServer});
+  const EDAChart({
+    super.key,
+    this.csvFile,
+    this.csvBytes,
+    this.edaFromServer,
+    this.forceReadCsv = false,
+  });
 
   // Predefined colors for consistent series visualization
   static const seriesColors = {
