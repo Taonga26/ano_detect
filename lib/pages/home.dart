@@ -32,7 +32,40 @@ class _HomePageState extends State<HomePage> {
       setState(() => selectedFile = file);
       try {
         final res = await api.uploadCsv(file);
+        // store result in state
         setState(() => result = res);
+
+        // Debug prints to confirm server payloads were received
+        try {
+          // Print high-level keys and sizes
+          print('== Server response keys: ${res.keys.toList()}');
+          print(
+            'EDA keys: ${res['eda'] != null ? (res['eda'] as Map).keys.toList() : 'null'}',
+          );
+          print(
+            'Recent keys: ${res['recent'] != null ? (res['recent'] as Map).keys.toList() : 'null'}',
+          );
+          print('Pie payload: ${res['pie']}');
+          final anomaliesList = res['anomalies'] as List?;
+          print(
+            'Anomalies count (raw from server): ${anomaliesList?.length ?? 0}',
+          );
+          if (anomaliesList != null && anomaliesList.isNotEmpty) {
+            print('First anomaly record: ${anomaliesList.first}');
+          }
+        } catch (e) {
+          print('Error while printing server response: $e');
+        }
+
+        // Quick user-visible confirmation
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Upload complete — anomalies: ${(res['anomalies'] as List?)?.length ?? 0}, eda cols: ${(res['eda']?['columns'] as List?)?.length ?? 0}',
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        );
       } catch (e) {
         ScaffoldMessenger.of(
           context,
