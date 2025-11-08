@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/service.dart';
-import 'eda_chart.dart';
+import 'eda_chart_clean.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -119,9 +119,8 @@ class _HomePageState extends State<HomePage> {
             "📊 Exploratory Data Analysis",
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          selectedFile != null
-              ? EDAChart(csvFile: selectedFile!)
-              : const Text('EDA chart unavailable (no uploaded file)'),
+          // Prefer server EDA when available; still pass csvFile for fallback parsing
+          EDAChart(csvFile: selectedFile, edaFromServer: result?['eda']),
           const SizedBox(height: 30),
           Text(
             "🚨 Recent Anomalies",
