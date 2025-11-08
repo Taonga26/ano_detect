@@ -18,6 +18,7 @@ class _HomePageState extends State<HomePage> {
   final ApiService api = ApiService();
   bool isLoading = false;
   Map<String, dynamic>? result;
+  File? selectedFile;
 
   Future<void> pickAndUploadFile() async {
     FilePickerResult? picked = await FilePicker.platform.pickFiles(
@@ -28,6 +29,7 @@ class _HomePageState extends State<HomePage> {
     if (picked != null) {
       setState(() => isLoading = true);
       File file = File(picked.files.single.path!);
+      setState(() => selectedFile = file);
       try {
         final res = await api.uploadCsv(file);
         setState(() => result = res);
@@ -66,7 +68,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget buildDashboard() {
-    final eda = result!['eda'];
     final recent = result!['recent'];
     final pie = result!['pie'];
     final anomalies = List<Map<String, dynamic>>.from(result!['anomalies']);
@@ -85,7 +86,9 @@ class _HomePageState extends State<HomePage> {
             "📊 Exploratory Data Analysis",
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          EDAChart(eda: eda),
+          selectedFile != null
+              ? EDAChart(csvFile: selectedFile!)
+              : const Text('EDA chart unavailable (no uploaded file)'),
           const SizedBox(height: 30),
           Text(
             "🚨 Recent Anomalies",
