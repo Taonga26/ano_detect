@@ -1,4 +1,4 @@
-import 'package:ano_detect/pages/home.dart';
+import 'package:ano_detect/controller/auth.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -23,7 +23,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: HomePage(),
+      home: Auth(),
     );
   }
 }
