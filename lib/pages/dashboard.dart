@@ -9,11 +9,12 @@ import 'package:flutter/scheduler.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:fl_chart/fl_chart.dart';
-import 'package:open_file/open_file.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
+
+import 'anomal_chart.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -28,7 +29,6 @@ class _DashboardPageState extends State<DashboardPage> {
   List<Map<String, dynamic>> edaData = [];
   Map<String, dynamic> pieData = {};
 
-  // Keys to capture charts
   final GlobalKey pieKey = GlobalKey();
   final GlobalKey anomalyChartKey = GlobalKey();
   final Map<String, GlobalKey> edaChartKeys = {
@@ -39,7 +39,8 @@ class _DashboardPageState extends State<DashboardPage> {
     'Volume': GlobalKey(),
   };
 
-  // -------------------- CSV UPLOAD --------------------
+  
+  // CSV UPLOAD
   Future<void> uploadCSV() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -50,7 +51,7 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() => isLoading = true);
 
     try {
-      final uri = Uri.parse('http://192.168.201.98:8000/api/v1/predict');
+      final uri = Uri.parse('http://127.0.0.1:8000/api/v1/predict');
       var request = http.MultipartRequest('POST', uri);
 
       if (kIsWeb) {
@@ -69,9 +70,10 @@ class _DashboardPageState extends State<DashboardPage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(responseBody);
+
         setState(() {
-          anomalies = List<Map<String, dynamic>>.from(data['anomalies'] ?? []);
-          edaData = List<Map<String, dynamic>>.from(data['eda'] ?? []);
+          anomalies = List<Map<String, dynamic>>.from(data['anomalies'] ?? []).reversed.toList();
+          edaData = List<Map<String, dynamic>>.from(data['eda'] ?? []).reversed.toList();
           pieData = Map<String, dynamic>.from(data['pie'] ?? {});
           isLoading = false;
         });
@@ -80,23 +82,28 @@ class _DashboardPageState extends State<DashboardPage> {
       }
     } catch (e) {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 
-  // -------------------- ANOMALIES TABLE --------------------
+ 
+  // TABLE VIEW FOR ANOMALIES
   Widget buildAnomaliesTable() {
     if (anomalies.isEmpty) return const Text("No anomalies detected");
+
     final columns = anomalies.first.keys.toList();
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
         headingRowColor: MaterialStateProperty.all(Colors.red.shade100),
         columns: columns
             .map((col) => DataColumn(
-          label: Text(col,
-              style: const TextStyle(fontWeight: FontWeight.bold)),
+          label:
+          Text(col, style: const TextStyle(fontWeight: FontWeight.bold)),
         ))
             .toList(),
         rows: anomalies.map((row) {
@@ -110,213 +117,202 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // -------------------- PIE CHART --------------------
+ 
+  // PIE CHART
   Widget buildPieChart() {
     if (pieData.isEmpty) return const Text("No pie data available");
 
-    final anomalyPercent = pieData['percentages']?['anomalies'] ?? 0.0;
-    final normalPercent = pieData['percentages']?['normal'] ?? 100.0;
+    final anomalyPercent = (pieData['percentages']?['anomalies'] ?? 0.0).toDouble();
+    final normalPercent = (pieData['percentages']?['normal'] ?? 100.0).toDouble();
     final anomalyPoints = pieData['anomalies'] ?? 0;
     final totalPoints = pieData['total_points'] ?? 0;
 
     return RepaintBoundary(
       key: pieKey,
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Anomalies detected: $anomalyPoints'),
-            const SizedBox(height: 5),
-            Text('Total entries: $totalPoints'),
-            const SizedBox(height: 10),
-            Center(
-              child: SizedBox(
-                height: 200,
-                child: PieChart(
-                  PieChartData(
-                    sections: [
-                      PieChartSectionData(
-                        value: anomalyPercent.toDouble(),
-                        color: Colors.redAccent,
-                        title: '${anomalyPercent.toStringAsFixed(1)}%',
-                        titleStyle: const TextStyle(
-                            fontWeight: FontWeight.bold, color: Colors.white),
-                        radius: 60,
-                        titlePositionPercentageOffset: 0.6,
-                      ),
-                      PieChartSectionData(
-                        value: normalPercent.toDouble(),
-                        color: Colors.green,
-                        title: '${normalPercent.toStringAsFixed(1)}%',
-                        titleStyle: const TextStyle(
-                            fontWeight: FontWeight.bold, color: Colors.white),
-                        radius: 60,
-                        titlePositionPercentageOffset: 0.6,
-                      ),
-                    ],
-                    sectionsSpace: 2,
-                    centerSpaceRadius: 40,
+      child: Column(
+        children: [
+          Text('Anomalies detected: $anomalyPoints'),
+          Text('Total entries: $totalPoints'),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 220,
+            child: PieChart(
+              PieChartData(
+                sections: [
+                  PieChartSectionData(
+                    value: anomalyPercent,
+                    color: Colors.redAccent,
+                    title: '${anomalyPercent.toStringAsFixed(1)}%',
+                    titleStyle: const TextStyle(color: Colors.white),
                   ),
-                ),
+                  PieChartSectionData(
+                    value: normalPercent,
+                    color: Colors.green,
+                    title: '${normalPercent.toStringAsFixed(1)}%',
+                    titleStyle: const TextStyle(color: Colors.white),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  // LINE CHART
+  Widget buildLineChart(
+      String title,
+      List<Map<String, dynamic>> data,
+      String dataKey,
+      Color color,
+      String xLabel,
+      String yLabel,
+      ) {
+    if (edaData.isEmpty) return const Text("No data available");
+
+    List<String> titles = data.map((d) {
+      final rawDateString = d['Date']?.toString() ?? '';
+      if (rawDateString.isEmpty) return '';
+
+    
+      try {
+        final dateTime = HttpDate.parse(rawDateString);
+        return DateFormat("dd/MM/yyyy").format(dateTime); 
+      } catch (e) {
+        // If HttpDate fails, fall back to the standard Dart parser
+        final dateTime = DateTime.tryParse(rawDateString);
+        if (dateTime != null) {
+          return DateFormat("dd/MM/yyyy").format(dateTime);
+        }
+      }
+
+      return rawDateString.length > 10 ? rawDateString.substring(0, 10) : rawDateString;
+    }).toList();
+
+    List<FlSpot> spots = [];
+    for (int i = 0; i < data.length; i++) {
+      final raw = data[i][dataKey];
+      final val = (raw is num) ? raw.toDouble() :
+      double.tryParse(raw?.toString() ?? '') ?? 0.0;
+      spots.add(FlSpot(i.toDouble(), val));
+    }
+
+    return RepaintBoundary(
+      key: edaChartKeys[dataKey],
+      child: SizedBox(
+        height: 300,
+        child: Card(
+          elevation: 3,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16)),
+                SizedBox(height: 15),
+                Expanded(
+                  child: LineChart(
+                    LineChartData(
+                      lineBarsData: [
+                        LineChartBarData(
+                            spots: spots,
+                            dotData: FlDotData(
+                              show: false,
+                            ),
+                            isCurved: true,
+                            color: color,
+                            barWidth: 2)
+                      ],
+                      titlesData: FlTitlesData(
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                              showTitles: true,
+                            reservedSize: 45
+                          ),
+                        ),
+                        rightTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        topTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true, // Always try to show titles
+                            reservedSize: 40, // Adjust size
+                            interval: (data.length / 6).ceilToDouble().clamp(1, double.infinity), // Dynamic interval
+                            getTitlesWidget: (value, meta) {
+                              final i = value.toInt();
+                              if (i >= 0 && i < titles.length) {
+                                // Rotate titles slightly for better fit
+                                return SideTitleWidget(
+                                  meta: meta,
+                                  angle: -0.5,
+                                  space: 4,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                    child: Text(titles[i], style: const TextStyle(fontSize: 10)),
+                                  ),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                        ),
+                      ),
+                      gridData: FlGridData(show: true),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  // -------------------- LINE CHART --------------------
-  Widget buildLineChart(String title, List<Map<String, dynamic>> data, String key,
-      Color color, String xLabel, String yLabel) {
-    if (edaData.isEmpty) return const Text("No data available for chart");
 
-    List<String> titles = data.map((d) {
-      String date = d['Date']?.toString() ?? '';
-      return date.split(' ')[0];
-    }).toList();
-
-    List<FlSpot> spots = [];
-    for (int i = 0; i < data.length; i++) {
-      spots.add(FlSpot(i.toDouble(), (data[i][key] ?? 0).toDouble()));
-    }
-
-    return RepaintBoundary(
-      key: edaChartKeys[key],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              height: 300,
-              width: 400,
-              child: LineChart(
-                LineChartData(
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: spots,
-                      isCurved: true,
-                      color: color,
-                      barWidth: 3,
-                      dotData: FlDotData(show: true),
-                    ),
-                  ],
-                  titlesData: FlTitlesData(
-                    bottomTitles: AxisTitles(
-                      axisNameWidget: Text(xLabel),
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        interval: (data.length / 5).floorToDouble() > 0
-                            ? (data.length / 5).floorToDouble()
-                            : 1,
-                        getTitlesWidget: (value, meta) {
-                          int idx = value.toInt();
-                          if (idx >= 0 && idx < titles.length) {
-                            return Text(
-                              titles[idx],
-                              style: const TextStyle(fontSize: 10),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      axisNameWidget: Text(yLabel),
-                      sideTitles: SideTitles(showTitles: true),
-                    ),
-                  ),
-                  gridData: FlGridData(show: true),
-                  borderData: FlBorderData(show: true),
-                  minY: 0,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
+  // WEB OR MOBILE — decide layout
+  bool isWideWeb(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    return kIsWeb && width > 900;
   }
 
-  // -------------------- ANOMALY CHART --------------------
-  Widget buildAnomalyChart() {
-    if (anomalies.isEmpty) return const Text("No anomalies to chart");
+  Widget buildChartsSection() {
+    final charts = [
+      buildLineChart("Open Prices", edaData, "Open", Colors.orange, "Date", "Open"),
+      buildLineChart("High Prices", edaData, "High", Colors.green, "Date", "High"),
+      buildLineChart("Low Prices", edaData, "Low", Colors.red, "Date", "Low"),
+      buildLineChart("Close Prices", edaData, "Close", Colors.blue, "Date", "Close"),
+      buildLineChart("Volume", edaData, "Volume", Colors.grey, "Date", "Volume"),
+    ];
 
-    List<String> titles = anomalies.map((d) {
-      String date = d['Date']?.toString() ?? '';
-      return date.split(' ')[0];
-    }).toList();
-
-    List<FlSpot> spots = [];
-    for (int i = 0; i < anomalies.length; i++) {
-      spots.add(FlSpot(i.toDouble(), (anomalies[i]['Close'] ?? 0).toDouble()));
+    if (isWideWeb(context)) {
+      // ------------------------ WEB GRID ------------------------
+      return GridView.count(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.6,
+        children: charts,
+      );
     }
 
-    return RepaintBoundary(
-      key: anomalyChartKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('🚨 Anomaly Chart', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              height: 300,
-              width: 450,
-              child: LineChart(
-                LineChartData(
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: spots,
-                      isCurved: true,
-                      color: Colors.redAccent,
-                      barWidth: 3,
-                      dotData: FlDotData(show: true),
-                    ),
-                  ],
-                  titlesData: FlTitlesData(
-                    bottomTitles: AxisTitles(
-                      axisNameWidget: const Text("Date"),
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        interval: (anomalies.length / 5).floorToDouble() > 0
-                            ? (anomalies.length / 5).floorToDouble()
-                            : 1,
-                        getTitlesWidget: (value, meta) {
-                          int idx = value.toInt();
-                          if (idx >= 0 && idx < titles.length) {
-                            return Text(titles[idx],
-                                style: const TextStyle(fontSize: 10));
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      axisNameWidget: const Text("Close"),
-                      sideTitles: SideTitles(showTitles: true),
-                    ),
-                  ),
-                  gridData: FlGridData(show: true),
-                  borderData: FlBorderData(show: true),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
+    // ------------------------ MOBILE LIST ------------------------
+    return Column(children: charts);
   }
 
-  // -------------------- CAPTURE WIDGET WITH RETRY --------------------
+
+  // PDF GENERATION
   Future<Uint8List?> captureWidget(GlobalKey key,
-      {int maxRetries = 10, int delayMs = 100}) async {
+      {int maxRetries = 10, int delayMs = 150}) async {
     int attempts = 0;
 
     while (attempts < maxRetries) {
@@ -325,7 +321,8 @@ class _DashboardPageState extends State<DashboardPage> {
         final renderObject = context.findRenderObject() as RenderRepaintBoundary?;
         if (renderObject != null) {
           try {
-            final image = await renderObject.toImage(pixelRatio: 3.0);
+            // Lowered pixelRatio for smaller images that still look fine in PDFs
+            final image = await renderObject.toImage(pixelRatio: 1.5);
             final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
             if (byteData != null) {
               return byteData.buffer.asUint8List();
@@ -343,10 +340,34 @@ class _DashboardPageState extends State<DashboardPage> {
     return null;
   }
 
-  // -------------------- GENERATE PDF --------------------
+  Future<Uint8List?> _captureWidgetByScrolling(GlobalKey key) async {
+    if (key.currentContext != null) {
+      try {
+        await Scrollable.ensureVisible(
+          key.currentContext!,
+          duration: const Duration(milliseconds: 300),
+          alignment: 0.5,
+        );
+      } catch (_) {
+        // ignored - ensureVisible can throw if widget not in a scrollable
+      }
+
+      // Give Flutter a moment to paint the widget after scrolling
+      await Future.delayed(const Duration(milliseconds: 300));
+      await WidgetsBinding.instance.endOfFrame;
+
+      return await captureWidget(key);
+    }
+
+    debugPrint("Could not find context for key. The widget might not be in the tree.");
+    return null;
+  }
+
+  // -------------------- GENERATE PDF (WEB-SAFE) --------------------
   Future<void> generatePdf() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You must be logged in to upload PDF!')),
       );
@@ -354,14 +375,14 @@ class _DashboardPageState extends State<DashboardPage> {
     }
 
     if (anomalies.isEmpty && pieData.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No data available for PDF')),
       );
       return;
     }
 
-    setState(() => isLoading = true);
-
+    // Show a persistent loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -370,20 +391,36 @@ class _DashboardPageState extends State<DashboardPage> {
           children: [
             CircularProgressIndicator(),
             SizedBox(width: 20),
-            Expanded(child: Text("Generating PDF...")),
+            Expanded(child: Text("Generating & Uploading PDF...")),
           ],
         ),
       ),
     );
 
     try {
-      // Ensure charts are rendered
-      await SchedulerBinding.instance.endOfFrame;
-      await Future.delayed(const Duration(milliseconds: 200));
+      
+      await Future.delayed(const Duration(milliseconds: 300));
+      await WidgetsBinding.instance.endOfFrame;
 
-      final anomalyImage = await captureWidget(anomalyChartKey);
-      final pieChartImage = await captureWidget(pieKey);
+      // --- Capture images by SCROLLING them into view first ---
+      final anomalyImage = await _captureWidgetByScrolling(anomalyChartKey);
+      final pieChartImage = await _captureWidgetByScrolling(pieKey);
+      final openPriceImage = await _captureWidgetByScrolling(edaChartKeys["Open"]!);
+      final closePriceImage = await _captureWidgetByScrolling(edaChartKeys["Close"]!);
 
+      // --- Check if essential captures were successful ---
+      if (anomalyImage == null || pieChartImage == null) {
+        debugPrint('Failed to capture essential charts. Aborting PDF generation.');
+        if (mounted) {
+          Navigator.of(context).pop(); 
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error: Could not capture chart images for PDF.')),
+          );
+        }
+        return;
+      }
+
+      // --- Build the PDF document ---
       final pdf = pw.Document();
       pdf.addPage(
         pw.MultiPage(
@@ -391,43 +428,48 @@ class _DashboardPageState extends State<DashboardPage> {
           build: (context) {
             final widgets = <pw.Widget>[];
 
-            widgets.add(
-              pw.Text("📊 Anomaly Report",
-                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
-            );
+            widgets.add(pw.Text("Anomaly Report",
+                style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)));
             widgets.add(pw.SizedBox(height: 20));
 
-            if (anomalyImage != null) {
-              widgets.add(pw.Text("🚨 Anomaly Chart", style: pw.TextStyle(fontSize: 16)));
+            // Anomaly Chart
+            widgets.add(pw.Text("Anomaly Chart", style: pw.TextStyle(fontSize: 16)));
+            widgets.add(pw.SizedBox(height: 10));
+            widgets.add(pw.Image(pw.MemoryImage(anomalyImage), width: 400, height: 250));
+            widgets.add(pw.SizedBox(height: 20));
+
+            // Pie Summary
+            widgets.add(pw.Text("Pie Summary", style: pw.TextStyle(fontSize: 16)));
+            widgets.add(pw.SizedBox(height: 10));
+            widgets.add(pw.Image(pw.MemoryImage(pieChartImage), width: 300, height: 200));
+            widgets.add(pw.SizedBox(height: 10));
+            widgets.add(pw.Text("Anomalies: ${pieData['anomalies'] ?? 0} | Total: ${pieData['total_points'] ?? 0}"));
+            widgets.add(pw.SizedBox(height: 20));
+
+            // Other charts
+            if (openPriceImage != null) {
+              widgets.add(pw.Text("Open Prices Chart", style: pw.TextStyle(fontSize: 16)));
               widgets.add(pw.SizedBox(height: 10));
-              widgets.add(pw.Image(pw.MemoryImage(anomalyImage), width: 400, height: 250));
+              widgets.add(pw.Image(pw.MemoryImage(openPriceImage)));
+              widgets.add(pw.SizedBox(height: 20));
+            }
+            if (closePriceImage != null) {
+              widgets.add(pw.Text("Close Prices Chart", style: pw.TextStyle(fontSize: 16)));
+              widgets.add(pw.SizedBox(height: 10));
+              widgets.add(pw.Image(pw.MemoryImage(closePriceImage)));
               widgets.add(pw.SizedBox(height: 20));
             }
 
-            if (pieChartImage != null) {
-              widgets.add(pw.Text("🥧 Pie Summary", style: pw.TextStyle(fontSize: 16)));
-              widgets.add(pw.SizedBox(height: 10));
-              widgets.add(pw.Image(pw.MemoryImage(pieChartImage), width: 300, height: 200));
-              widgets.add(pw.SizedBox(height: 10));
-              widgets.add(
-                pw.Text(
-                  "Anomalies: ${pieData['anomalies'] ?? 0} | Total: ${pieData['total_points'] ?? 0}",
-                ),
-              );
-              widgets.add(pw.SizedBox(height: 20));
-            }
-
+            // Anomalies Table
             if (anomalies.isNotEmpty) {
               widgets.add(pw.Text("Detected Anomalies Table", style: pw.TextStyle(fontSize: 16)));
               widgets.add(pw.SizedBox(height: 10));
-              widgets.add(
-                pw.Table.fromTextArray(
-                  headers: anomalies.first.keys.toList(),
-                  data: anomalies
-                      .map((row) => row.values.map((v) => v.toString()).toList())
-                      .toList(),
-                ),
-              );
+              widgets.add(pw.Table.fromTextArray(
+                headers: anomalies.first.keys.toList(),
+                data: anomalies
+                    .map((row) => row.values.map((v) => v.toString()).toList())
+                    .toList(),
+              ));
             }
 
             return widgets;
@@ -435,38 +477,38 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
       );
 
+      // --- Save and Upload ---
+      final bytes = await pdf.save();
+      final fileName = 'anomaly_report_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final filePath = '${user.id}/$fileName';
 
+      await Supabase.instance.client.storage.from('reports').uploadBinary(
+        filePath,
+        bytes,
+        fileOptions: const FileOptions(
+          cacheControl: '3600',
+          upsert: false,
+        ),
+      );
 
-      // Upload to Supabase with RLS-safe user_id
-      final supabase = Supabase.instance.client;
-
-      try {
-        final bytes = await pdf.save();
-
-        // Save locally
-        final dir = await getApplicationDocumentsDirectory();
-        final fileName = 'anomaly_report_${DateTime.now().millisecondsSinceEpoch}.pdf';
-        final file = File('${dir.path}/$fileName');
-        await file.writeAsBytes(bytes);
-
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('PDF saved & uploaded!')));
-        await OpenFile.open(file.path);
-      } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ PDF generated and uploaded successfully!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Upload failed: ${e.toString()}')));
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('PDF generation error: $e')));
-    } finally {
-      Navigator.of(context).pop(); // Close loading dialog
-      setState(() => isLoading = false);
     }
   }
 
-
-  // -------------------- BUILD --------------------
+  // =====================================================
+  // BUILD UI
+  // =====================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -476,45 +518,52 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ListView(
-          children: [
-            const Text('Analysis charts',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            if (edaData.isNotEmpty) ...[
-              buildLineChart("Open Prices", edaData, "Open", Colors.orange, "Date", "Open"),
-              buildLineChart("High Prices", edaData, "High", Colors.green, "Date", "High"),
-              buildLineChart("Low Prices", edaData, "Low", Colors.red, "Date", "Low"),
-              buildLineChart("Close Prices", edaData, "Close", Colors.blue, "Date", "Close"),
-              buildLineChart("Volume", edaData, "Volume", Colors.grey, "Date", "Volume"),
-            ],
-            const Divider(height: 30),
-            const Text('🚨 Detected Anomalies',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            buildAnomaliesTable(),
-            const Divider(height: 30),
-            buildAnomalyChart(),
-            const Divider(height: 30),
-            const Text('🥧 Pie Summary',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            buildPieChart(),
-          ],
-        ),
-      ),
+          : ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+          const Text('Analysis charts',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+
+          if (edaData.isNotEmpty) buildChartsSection(),
+
+          const Divider(),
+
+          const Text('Detected Anomalies',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          buildAnomaliesTable(),
+
+          const Divider(),
+
+          AnomalyChartWidget(
+            allData: edaData,
+            anomalies: anomalies,
+            chartKey: anomalyChartKey,
+          ),
+
+          const Divider(),
+
+          const Text('Pie Summary',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+
+          buildPieChart(),
+                  ],
+                ),
+
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           FloatingActionButton(
+            heroTag: "upload",
             backgroundColor: Colors.blueAccent,
             onPressed: uploadCSV,
             child: const Icon(Icons.upload_file),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           FloatingActionButton(
+            heroTag: "pdf",
             backgroundColor: Colors.green,
             onPressed: generatePdf,
             child: const Icon(Icons.picture_as_pdf),

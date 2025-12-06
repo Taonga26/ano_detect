@@ -14,21 +14,15 @@ class _SignupPageState extends State<SignupPage> {
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
   bool isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
+
+  final _formKey = GlobalKey<FormState>();
 
   Future<void> _signup() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-    final confirm = _confirmController.text;
-
-    if (email.isEmpty || password.isEmpty || confirm.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Please fill all fields')));
-      return;
-    }
-
-    if (password != confirm) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Passwords do not match')));
+    
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
@@ -36,72 +30,152 @@ class _SignupPageState extends State<SignupPage> {
 
     try {
       final response = await supabase.auth.signUp(
-        email: email,
-        password: password,
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
       );
 
-      if (response.user != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sign up successful! Check your email.')),
-        );
-        Navigator.pop(context);
-      }
-      final user = supabase.auth.currentUser;
+      final User? user = response.user;
+
       if (user != null) {
-        try {
-          await supabase.from('user_profiles').insert({
-            'id': user.id,
-            'email': user.email,
-            'full_name': 'Jon ', // you can fill this from a form
-            'created_at': DateTime.now().toIso8601String(),
-          });
-        } catch (e) {
-          print('Error creating profile: $e');
+        await supabase.from('user_profiles').insert({
+          'id': user.id,
+          'email': _emailController.text.trim(),
+          'full_name': '',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Sign up successful! Check your email for verification.')),
+          );
+          Navigator.pop(context);
         }
       }
     } on AuthException catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('An unexpected error occurred: $e')));
+      }
     }
 
-    setState(() => isLoading = false);
+    if (mounted) {
+      setState(() => isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Sign Up')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(labelText: 'Email'),
-              keyboardType: TextInputType.emailAddress,
+      body: Form(
+        key: _formKey,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 400),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TextFormField(
+                    controller: _emailController,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      prefixIcon: Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter an email';
+                      }
+                      if (!RegExp(r'\S+@\S+\.\S+').hasMatch(value)) {
+                        return 'Please enter a valid email address';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a password';
+                      }
+                      if (value.length < 6) {
+                        return 'Password must be at least 6 characters long';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _confirmController,
+                    obscureText: _obscureConfirmPassword,
+                    decoration: InputDecoration(
+                      labelText: 'Confirm Password',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                        ),
+                        onPressed: () => setState(
+                                () => _obscureConfirmPassword = !_obscureConfirmPassword),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please confirm your password';
+                      }
+                      if (value != _passwordController.text) {
+                        return 'Passwords do not match';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: isLoading ? null : _signup,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(isLoading ? 'Signing up...' : 'Sign Up'),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Password'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _confirmController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Confirm Password'),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: isLoading ? null : _signup,
-              child: Text(isLoading ? 'Signing up...' : 'Sign Up'),
-            ),
-          ],
+          ),
         ),
       ),
     );
